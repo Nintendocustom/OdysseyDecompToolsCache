@@ -1,0 +1,3 @@
+[submodule "nx-decomp-tools"]
+	path = nx-decomp-tools
+	url = https://github.com/open-ead/nx-decomp-tools
