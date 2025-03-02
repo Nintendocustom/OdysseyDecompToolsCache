@@ -1,5 +1,7 @@
 name: Generate prebuilt archives
 on: [push, pull_request]
+permissions:
+  contents: write
 
 jobs:
   generate:
@@ -30,3 +32,13 @@ jobs:
       with:
         name: OdysseyDecomp-libcxx-headers
         path: build/OdysseyDecomp-libcxx-headers.tar.xz
+    - uses: softprops/action-gh-release@v2
+      if: github.ref == 'refs/heads/master'
+      with:
+        files: |
+          build/OdysseyDecomp-binaries_Linux.tar.xz
+          build/OdysseyDecomp-libcxx-headers.tar.xz
+        preserve_order: true
+        fail_on_unmatched_files: true
+        generate_release_notes: true
+        make_latest: true
