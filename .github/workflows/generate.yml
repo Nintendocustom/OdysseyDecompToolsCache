@@ -1,5 +1,8 @@
 name: Generate prebuilt archives
-on: [push, pull_request]
+on:
+  push:
+    tags:
+      - '*'
 permissions:
   contents: write
 
