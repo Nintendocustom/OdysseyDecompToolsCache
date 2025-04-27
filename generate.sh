@@ -63,6 +63,7 @@ cp nx-decomp-tools/viking/target/release/decompme build/OdysseyDecomp-binaries_L
 
 # copy libc++ from clang 3.9.1
 cp -r download/clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-16.04/include/c++/v1/* build/OdysseyDecomp-libcxx-headers/include
+cp -r download/clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-16.04/lib/clang/3.9.1/include/arm_neon.h build/OdysseyDecomp-libcxx-headers/include
 
 
 # create tarball

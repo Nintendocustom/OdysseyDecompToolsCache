@@ -37,7 +37,7 @@ jobs:
         path: build/OdysseyDecomp-libcxx-headers.tar.xz
     - uses: softprops/action-gh-release@v2
       with:
-        tag_name: v${{ github.ref_name }}
+        tag_name: ${{ github.ref_name }}
         files: |
           build/OdysseyDecomp-binaries_Linux.tar.xz
           build/OdysseyDecomp-libcxx-headers.tar.xz
