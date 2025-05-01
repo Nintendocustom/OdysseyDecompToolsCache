@@ -1,8 +1,5 @@
 name: Generate prebuilt archives
-on:
-  push:
-    tags:
-      - '*'
+on: [push, pull_request]
 permissions:
   contents: write
 
@@ -25,7 +22,16 @@ jobs:
           download/clang+llvm-4.0.1-x86_64-linux-gnu-Fedora-25
     - name: Generate prebuilt archives
       run: ./generate.sh
+    - uses: actions/upload-artifact@v4
+      with:
+        name: OdysseyDecomp-binaries_Linux
+        path: build/OdysseyDecomp-binaries_Linux.tar.xz
+    - uses: actions/upload-artifact@v4
+      with:
+        name: OdysseyDecomp-libcxx-headers
+        path: build/OdysseyDecomp-libcxx-headers.tar.xz
     - uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
       with:
         tag_name: ${{ github.ref_name }}
         files: |
