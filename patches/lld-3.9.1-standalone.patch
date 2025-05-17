@@ -1,0 +1,266 @@
+diff -Naur --exclude=.DS_Store lld-3.9.1.src.orig/CMakeLists.txt lld-3.9.1.src/CMakeLists.txt
+--- lld-3.9.1.src.orig/CMakeLists.txt	2016-03-02 20:56:23
++++ lld-3.9.1.src/CMakeLists.txt	2025-04-16 11:56:51
+@@ -1,3 +1,84 @@
++# Minimum CMake version required
++cmake_minimum_required(VERSION 3.5) # Updated based on warning
++
++# Define the project
++project(lld CXX C)
++
++# --- Manually include the LLVM setup ---
++# Ensure LLVM_SRC_DIR is defined (passed via -D...)
++if(NOT DEFINED LLVM_SRC_DIR)
++    message(FATAL_ERROR "LLVM_SRC_DIR must be defined (e.g., via -DLLVM_SRC_DIR=...)")
++endif()
++
++# **Add the LLVM modules directory to the CMake module search path**
++set(LLVM_CMAKE_MODULES_DIR "${LLVM_SRC_DIR}/cmake/modules")
++if(NOT IS_DIRECTORY "${LLVM_CMAKE_MODULES_DIR}")
++     message(FATAL_ERROR "LLVM CMake modules directory not found: ${LLVM_CMAKE_MODULES_DIR}")
++endif()
++# Prepend the directory to CMAKE_MODULE_PATH so include() can find other modules
++# Use list(INSERT ...) to ensure it's searched first
++list(INSERT CMAKE_MODULE_PATH 0 "${LLVM_CMAKE_MODULES_DIR}")
++message(STATUS "Prepended to CMAKE_MODULE_PATH: ${LLVM_CMAKE_MODULES_DIR}")
++
++# Now, include the necessary LLVM modules using their names
++# CMake will find them because we updated CMAKE_MODULE_PATH
++include(AddLLVM)
++# HandleLLVMOptions is usually needed as well
++include(HandleLLVMOptions)
++
++# Find the pre-built LLVM package using the build directory path
++# CMAKE_PREFIX_PATH should be passed via -D...
++find_package(LLVM 3.9.1 REQUIRED CONFIG
++  HINTS "${CMAKE_PREFIX_PATH}" NO_DEFAULT_PATH) # Use HINTS for robustness
++if(NOT LLVM_FOUND)
++    message(FATAL_ERROR "find_package(LLVM) failed. Check CMAKE_PREFIX_PATH points to the LLVM build directory containing LLVMConfig.cmake")
++endif()
++message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION} in ${LLVM_DIR}") # LLVM_DIR shows where LLVMConfig.cmake was found
++message(STATUS "LLVM include directories: ${LLVM_INCLUDE_DIRS}")
++message(STATUS "LLVM library directories: ${LLVM_LIBRARY_DIRS}")
++
++# Apply the found LLVM configuration
++include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
++link_directories(${LLVM_LIBRARY_DIRS}) # Might be needed by linker later
++add_definitions(${LLVM_DEFINITIONS}) # Pass definitions like LLVM_ENABLE_RTTI
++
++# Set LLVM_MAIN_SRC_DIR required by some CMake modules like TableGen
++set(LLVM_MAIN_SRC_DIR ${LLVM_SRC_DIR})
++message(STATUS "Set LLVM_MAIN_SRC_DIR to ${LLVM_MAIN_SRC_DIR}")
++
++# Set LLVM_MAIN_INCLUDE_DIR required by TableGen
++set(LLVM_MAIN_INCLUDE_DIR "${LLVM_SRC_DIR}/include")
++if(NOT IS_DIRECTORY "${LLVM_MAIN_INCLUDE_DIR}")
++  message(FATAL_ERROR "LLVM main include directory not found: ${LLVM_MAIN_INCLUDE_DIR}")
++endif()
++message(STATUS "Set LLVM_MAIN_INCLUDE_DIR to ${LLVM_MAIN_INCLUDE_DIR}")
++
++# Explicitly find the llvm-tblgen executable required by TableGen.cmake
++# LLVM_DIR is set by find_package(LLVM ...) and points to the directory containing LLVMConfig.cmake
++# e.g., /path/to/llvm-build/lib/cmake/llvm
++get_filename_component(LLVM_CMAKE_DIR "${LLVM_DIR}" DIRECTORY) # /path/to/llvm-build/lib/cmake
++get_filename_component(LLVM_LIB_DIR "${LLVM_CMAKE_DIR}" DIRECTORY) # /path/to/llvm-build/lib
++get_filename_component(LLVM_BUILD_DIR_ROOT "${LLVM_LIB_DIR}" DIRECTORY) # /path/to/llvm-build
++
++find_program(LLVM_TABLEGEN_EXE llvm-tblgen
++             HINTS "${LLVM_BUILD_DIR_ROOT}/bin" # Look in the bin directory of the build root
++             NO_DEFAULT_PATH) # Search only hint path first
++
++# Fallback: Sometimes it might be directly in CMAKE_PREFIX_PATH/bin
++if(NOT LLVM_TABLEGEN_EXE AND EXISTS "${CMAKE_PREFIX_PATH}/bin")
++    find_program(LLVM_TABLEGEN_EXE llvm-tblgen
++                 HINTS "${CMAKE_PREFIX_PATH}/bin")
++endif()
++
++if(NOT LLVM_TABLEGEN_EXE)
++  message(FATAL_ERROR "llvm-tblgen executable not found. Searched in ${LLVM_BUILD_DIR_ROOT}/bin and ${CMAKE_PREFIX_PATH}/bin. Ensure llvm-tblgen was built correctly as part of LLVM.")
++else()
++  message(STATUS "Found llvm-tblgen: ${LLVM_TABLEGEN_EXE}")
++endif()
++
++# Include TableGen for the tablegen() function (needs LLVM_TABLEGEN_EXE)
++include(TableGen)
++
+ set(LLD_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+ set(LLD_INCLUDE_DIR ${LLD_SOURCE_DIR}/include )
+ set(LLD_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+diff -Naur --exclude=.DS_Store lld-3.9.1.src.orig/COFF/CMakeLists.txt lld-3.9.1.src/COFF/CMakeLists.txt
+--- lld-3.9.1.src.orig/COFF/CMakeLists.txt	2016-11-28 17:10:56
++++ lld-3.9.1.src/COFF/CMakeLists.txt	2025-04-16 12:07:12
+@@ -33,4 +33,6 @@
+   LINK_LIBS ${PTHREAD_LIB}
+   )
+ 
+-add_dependencies(lldCOFF COFFOptionsTableGen intrinsics_gen)
++target_include_directories(lldCOFF PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
++
++#add_dependencies(lldCOFF COFFOptionsTableGen intrinsics_gen)
+diff -Naur --exclude=.DS_Store lld-3.9.1.src.orig/ELF/CMakeLists.txt lld-3.9.1.src/ELF/CMakeLists.txt
+--- lld-3.9.1.src.orig/ELF/CMakeLists.txt	2016-07-08 12:10:27
++++ lld-3.9.1.src/ELF/CMakeLists.txt	2025-04-16 12:07:04
+@@ -47,4 +47,6 @@
+   ${PTHREAD_LIB}
+   )
+ 
+-add_dependencies(lldELF intrinsics_gen ELFOptionsTableGen)
++target_include_directories(lldELF PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
++
++#add_dependencies(lldELF intrinsics_gen ELFOptionsTableGen)
+diff -Naur --exclude=.DS_Store lld-3.9.1.src.orig/ELF/Symbols.cpp lld-3.9.1.src/ELF/Symbols.cpp
+--- lld-3.9.1.src.orig/ELF/Symbols.cpp	2016-07-17 21:35:00
++++ lld-3.9.1.src/ELF/Symbols.cpp	2025-04-16 12:13:53
+@@ -290,45 +290,85 @@
+ template bool SymbolBody::hasThunk<ELF64LE>() const;
+ template bool SymbolBody::hasThunk<ELF64BE>() const;
+ 
+-template uint32_t SymbolBody::template getVA<ELF32LE>(uint32_t) const;
+-template uint32_t SymbolBody::template getVA<ELF32BE>(uint32_t) const;
+-template uint64_t SymbolBody::template getVA<ELF64LE>(uint64_t) const;
+-template uint64_t SymbolBody::template getVA<ELF64BE>(uint64_t) const;
++//template uint32_t SymbolBody::template getVA<ELF32LE>(uint32_t) const;
++//template uint32_t SymbolBody::template getVA<ELF32BE>(uint32_t) const;
++//template uint64_t SymbolBody::template getVA<ELF64LE>(uint64_t) const;
++//template uint64_t SymbolBody::template getVA<ELF64BE>(uint64_t) const;
+ 
+-template uint32_t SymbolBody::template getGotVA<ELF32LE>() const;
+-template uint32_t SymbolBody::template getGotVA<ELF32BE>() const;
+-template uint64_t SymbolBody::template getGotVA<ELF64LE>() const;
+-template uint64_t SymbolBody::template getGotVA<ELF64BE>() const;
++template uint32_t SymbolBody::getVA<ELF32LE>(uint32_t) const;
++template uint32_t SymbolBody::getVA<ELF32BE>(uint32_t) const;
++template uint64_t SymbolBody::getVA<ELF64LE>(uint64_t) const;
++template uint64_t SymbolBody::getVA<ELF64BE>(uint64_t) const;
+ 
+-template uint32_t SymbolBody::template getGotOffset<ELF32LE>() const;
+-template uint32_t SymbolBody::template getGotOffset<ELF32BE>() const;
+-template uint64_t SymbolBody::template getGotOffset<ELF64LE>() const;
+-template uint64_t SymbolBody::template getGotOffset<ELF64BE>() const;
++//template uint32_t SymbolBody::template getGotVA<ELF32LE>() const;
++//template uint32_t SymbolBody::template getGotVA<ELF32BE>() const;
++//template uint64_t SymbolBody::template getGotVA<ELF64LE>() const;
++//template uint64_t SymbolBody::template getGotVA<ELF64BE>() const;
+ 
+-template uint32_t SymbolBody::template getGotPltVA<ELF32LE>() const;
+-template uint32_t SymbolBody::template getGotPltVA<ELF32BE>() const;
+-template uint64_t SymbolBody::template getGotPltVA<ELF64LE>() const;
+-template uint64_t SymbolBody::template getGotPltVA<ELF64BE>() const;
++template uint32_t SymbolBody::getGotVA<ELF32LE>() const;
++template uint32_t SymbolBody::getGotVA<ELF32BE>() const;
++template uint64_t SymbolBody::getGotVA<ELF64LE>() const;
++template uint64_t SymbolBody::getGotVA<ELF64BE>() const;
+ 
+-template uint32_t SymbolBody::template getThunkVA<ELF32LE>() const;
+-template uint32_t SymbolBody::template getThunkVA<ELF32BE>() const;
+-template uint64_t SymbolBody::template getThunkVA<ELF64LE>() const;
+-template uint64_t SymbolBody::template getThunkVA<ELF64BE>() const;
++//template uint32_t SymbolBody::template getGotOffset<ELF32LE>() const;
++//template uint32_t SymbolBody::template getGotOffset<ELF32BE>() const;
++//template uint64_t SymbolBody::template getGotOffset<ELF64LE>() const;
++//template uint64_t SymbolBody::template getGotOffset<ELF64BE>() const;
+ 
+-template uint32_t SymbolBody::template getGotPltOffset<ELF32LE>() const;
+-template uint32_t SymbolBody::template getGotPltOffset<ELF32BE>() const;
+-template uint64_t SymbolBody::template getGotPltOffset<ELF64LE>() const;
+-template uint64_t SymbolBody::template getGotPltOffset<ELF64BE>() const;
++template uint32_t SymbolBody::getGotOffset<ELF32LE>() const;
++template uint32_t SymbolBody::getGotOffset<ELF32BE>() const;
++template uint64_t SymbolBody::getGotOffset<ELF64LE>() const;
++template uint64_t SymbolBody::getGotOffset<ELF64BE>() const;
+ 
+-template uint32_t SymbolBody::template getPltVA<ELF32LE>() const;
+-template uint32_t SymbolBody::template getPltVA<ELF32BE>() const;
+-template uint64_t SymbolBody::template getPltVA<ELF64LE>() const;
+-template uint64_t SymbolBody::template getPltVA<ELF64BE>() const;
++//template uint32_t SymbolBody::template getGotPltVA<ELF32LE>() const;
++//template uint32_t SymbolBody::template getGotPltVA<ELF32BE>() const;
++//template uint64_t SymbolBody::template getGotPltVA<ELF64LE>() const;
++//template uint64_t SymbolBody::template getGotPltVA<ELF64BE>() const;
+ 
+-template uint32_t SymbolBody::template getSize<ELF32LE>() const;
+-template uint32_t SymbolBody::template getSize<ELF32BE>() const;
+-template uint64_t SymbolBody::template getSize<ELF64LE>() const;
+-template uint64_t SymbolBody::template getSize<ELF64BE>() const;
++template uint32_t SymbolBody::getGotPltVA<ELF32LE>() const;
++template uint32_t SymbolBody::getGotPltVA<ELF32BE>() const;
++template uint64_t SymbolBody::getGotPltVA<ELF64LE>() const;
++template uint64_t SymbolBody::getGotPltVA<ELF64BE>() const;
++
++//template uint32_t SymbolBody::template getThunkVA<ELF32LE>() const;
++//template uint32_t SymbolBody::template getThunkVA<ELF32BE>() const;
++//template uint64_t SymbolBody::template getThunkVA<ELF64LE>() const;
++//template uint64_t SymbolBody::template getThunkVA<ELF64BE>() const;
++
++template uint32_t SymbolBody::getThunkVA<ELF32LE>() const;
++template uint32_t SymbolBody::getThunkVA<ELF32BE>() const;
++template uint64_t SymbolBody::getThunkVA<ELF64LE>() const;
++template uint64_t SymbolBody::getThunkVA<ELF64BE>() const;
++
++//template uint32_t SymbolBody::template getGotPltOffset<ELF32LE>() const;
++//template uint32_t SymbolBody::template getGotPltOffset<ELF32BE>() const;
++//template uint64_t SymbolBody::template getGotPltOffset<ELF64LE>() const;
++//template uint64_t SymbolBody::template getGotPltOffset<ELF64BE>() const;
++
++template uint32_t SymbolBody::getGotPltOffset<ELF32LE>() const;
++template uint32_t SymbolBody::getGotPltOffset<ELF32BE>() const;
++template uint64_t SymbolBody::getGotPltOffset<ELF64LE>() const;
++template uint64_t SymbolBody::getGotPltOffset<ELF64BE>() const;
++
++//template uint32_t SymbolBody::template getPltVA<ELF32LE>() const;
++//template uint32_t SymbolBody::template getPltVA<ELF32BE>() const;
++//template uint64_t SymbolBody::template getPltVA<ELF64LE>() const;
++//template uint64_t SymbolBody::template getPltVA<ELF64BE>() const;
++
++template uint32_t SymbolBody::getPltVA<ELF32LE>() const;
++template uint32_t SymbolBody::getPltVA<ELF32BE>() const;
++template uint64_t SymbolBody::getPltVA<ELF64LE>() const;
++template uint64_t SymbolBody::getPltVA<ELF64BE>() const;
++
++//template uint32_t SymbolBody::template getSize<ELF32LE>() const;
++//template uint32_t SymbolBody::template getSize<ELF32BE>() const;
++//template uint64_t SymbolBody::template getSize<ELF64LE>() const;
++//template uint64_t SymbolBody::template getSize<ELF64BE>() const;
++
++template uint32_t SymbolBody::getSize<ELF32LE>() const;
++template uint32_t SymbolBody::getSize<ELF32BE>() const;
++template uint64_t SymbolBody::getSize<ELF64LE>() const;
++template uint64_t SymbolBody::getSize<ELF64BE>() const;
+ 
+ template class elf::DefinedSynthetic<ELF32LE>;
+ template class elf::DefinedSynthetic<ELF32BE>;
+diff -Naur --exclude=.DS_Store lld-3.9.1.src.orig/lib/Driver/CMakeLists.txt lld-3.9.1.src/lib/Driver/CMakeLists.txt
+--- lld-3.9.1.src.orig/lib/Driver/CMakeLists.txt	2016-03-02 14:08:05
++++ lld-3.9.1.src/lib/Driver/CMakeLists.txt	2025-04-16 12:06:47
+@@ -19,4 +19,6 @@
+     LLVMSupport
+   )
+ 
++target_include_directories(lldDriver PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
++
+ add_dependencies(lldDriver DriverOptionsTableGen)
+diff -Naur --exclude=.DS_Store lld-3.9.1.src.orig/tools/lld/CMakeLists.txt lld-3.9.1.src/tools/lld/CMakeLists.txt
+--- lld-3.9.1.src.orig/tools/lld/CMakeLists.txt	2016-03-01 10:56:53
++++ lld-3.9.1.src/tools/lld/CMakeLists.txt	2025-04-16 12:26:02
+@@ -12,13 +12,12 @@
+ install(TARGETS lld
+   RUNTIME DESTINATION bin)
+ 
+-if(NOT LLD_SYMLINKS_TO_CREATE)
+-  set(LLD_SYMLINKS_TO_CREATE lld-link ld.lld)
+-endif()
++#if(NOT LLD_SYMLINKS_TO_CREATE)
++#  set(LLD_SYMLINKS_TO_CREATE lld-link ld.lld)
++#endif()
+ 
+-foreach(link ${LLD_SYMLINKS_TO_CREATE})
+-  add_llvm_tool_symlink(${link} lld ALWAYS_GENERATE)
+-  # Always generate install targets
+-  llvm_install_symlink(${link} lld ALWAYS_GENERATE)
+-endforeach()
+-
++#foreach(link ${LLD_SYMLINKS_TO_CREATE})
++#  add_llvm_tool_symlink(${link} lld ALWAYS_GENERATE)
++#  # Always generate install targets
++#  llvm_install_symlink(${link} lld ALWAYS_GENERATE)
++#endforeach()

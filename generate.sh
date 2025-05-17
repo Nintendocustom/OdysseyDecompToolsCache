@@ -1,75 +1,127 @@
 #!/bin/bash
 
-# fail on first error
+function build_llvm_binaries {
+
+    COMMON_CMAKE_ARGS=(
+        -GNinja
+        -DCMAKE_BUILD_TYPE=Release
+        -DLLVM_BUILD_TESTS=OFF
+        -DLLVM_INCLUDE_TESTS=OFF
+        -DLLVM_BUILD_EXAMPLES=OFF
+        -DLLVM_INCLUDE_EXAMPLES=OFF
+        -DLLVM_BUILD_DOCS=OFF
+        -DLLVM_ENABLE_SPHINX=OFF
+        -DLLVM_ENABLE_DOXYGEN=OFF
+    )
+
+    if [ -f "llvm-3.9.1.src/build/bin/llvm-config" ] && [ -f "cfe-3.9.1.src/build/bin/clang-3.9" ] && [ -f "lld-3.9.1.src/build/tools/lld/lld" ]; then
+        return
+    fi
+
+    if ! python --version 2>&1 | grep -q "2\.7" && ! command -v python2.7 >/dev/null; then
+        echo "Python 2.7 is required for building llvm, but was not found"
+        exit 1
+    fi
+
+    # Download llvm 3.9.1 src
+    if [ ! -f "llvm-3.9.1.src.tar.xz" ]; then
+        curl -O https://releases.llvm.org/3.9.1/llvm-3.9.1.src.tar.xz
+    fi
+
+    # Extract llvm 3.9.1 src
+    if [ ! -d "llvm-3.9.1.src" ]; then
+        tar xf llvm-3.9.1.src.tar.xz
+    fi
+
+    # Build llvm 3.9.1
+    cmake "${COMMON_CMAKE_ARGS[@]}" -S llvm-3.9.1.src -B llvm-3.9.1.src/build
+    ninja -C llvm-3.9.1.src/build
+
+    # Download clang 3.9.1 src
+    if [ ! -f "cfe-3.9.1.src.tar.xz" ]; then
+        curl -O https://releases.llvm.org/3.9.1/cfe-3.9.1.src.tar.xz
+    fi
+
+    # Extract clang 3.9.1 src
+    if [ ! -d "cfe-3.9.1.src" ]; then
+        tar xf cfe-3.9.1.src.tar.xz
+    fi
+
+    # Apply patch to fix building clang 3.9.1
+    pushd cfe-3.9.1.src
+    patch -p1 --forward < ../../patches/clang-391-compile-fix.patch | true
+    popd
+
+    # Build clang 3.9.1
+    cmake "${COMMON_CMAKE_ARGS[@]}" -DLLVM_CONFIG=$(pwd)/llvm-3.9.1.src/build/bin/llvm-config -S cfe-3.9.1.src -B cfe-3.9.1.src/build
+    ninja -C cfe-3.9.1.src/build
+
+    # Download lld 3.9.1 src
+    if [ ! -f "lld-3.9.1.src.tar.xz" ]; then
+        curl -O https://releases.llvm.org/3.9.1/lld-3.9.1.src.tar.xz
+    fi
+
+    # Extract lld 3.9.1 src
+    if [ ! -d "lld-3.9.1.src" ]; then
+        tar xf lld-3.9.1.src.tar.xz
+    fi
+
+    # Apply patch to fix building lld 3.9.1
+    pushd lld-3.9.1.src
+    patch -p1 --forward < ../../patches/lld-3.9.1-standalone.patch || true
+    popd
+
+    # Build lld 3.9.1
+    cmake "${COMMON_CMAKE_ARGS[@]}" -DLLVM_SRC_DIR=$(pwd)/llvm-3.9.1.src -DCMAKE_PREFIX_PATH=$(pwd)/llvm-3.9.1.src/build -DPACKAGE_VERSION="3.9.1" -S lld-3.9.1.src -B lld-3.9.1.src/build
+    ninja -C lld-3.9.1.src/build
+}
+
+function build_viking_tools {
+    pushd nx-decomp-tools/viking
+    cargo build --manifest-path Cargo.toml --release
+    popd
+}
+
+function build_archives {
+    OS=$(uname -s)
+    ARCH=$(uname -m)
+    BIN_OUT_NAME="OdysseyDecomp-binaries_$ARCH-$OS"
+
+    # Create folder skeleton
+    mkdir -p build/$BIN_OUT_NAME/bin
+    mkdir -p build/OdysseyDecomp-libcxx-headers/include
+
+    # Copy clang 3.9.1
+    cp download/cfe-3.9.1.src/build/bin/clang-3.9 build/$BIN_OUT_NAME/bin/clang
+
+    # Copy lld 3.9.1
+    cp download/lld-3.9.1.src/build/tools/lld/lld build/$BIN_OUT_NAME/bin/ld.lld
+
+    # Copy viking tools
+    cp nx-decomp-tools/viking/target/release/check build/$BIN_OUT_NAME/bin/
+    cp nx-decomp-tools/viking/target/release/listsym build/$BIN_OUT_NAME/bin/
+    cp nx-decomp-tools/viking/target/release/decompme build/$BIN_OUT_NAME/bin/
+
+    # Create tools tarball
+    pushd build/$BIN_OUT_NAME
+    tar -cJf ../$BIN_OUT_NAME.tar.xz *
+    popd
+}
+
+# Fail on first error
 set -e
 
 # create directory for files being downloaded
 mkdir -p download
 
-# download clang 3.9.1
-pushd download
-if [ ! -f "clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz" ]; then
-    wget https://releases.llvm.org/3.9.1/clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-fi
-popd
-
-# extract clang 3.9.1
-pushd download
-if [ ! -d "clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-16.04" ]; then
-    tar xf clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-fi
-popd
-
-# download clang 4.0.1
-pushd download
-if [ ! -f "clang+llvm-4.0.1-x86_64-linux-gnu-Fedora-25.tar.xz" ]; then
-    wget https://releases.llvm.org/4.0.1/clang+llvm-4.0.1-x86_64-linux-gnu-Fedora-25.tar.xz
-fi
-popd
-
-# extract clang 4.0.1
-pushd download
-if [ ! -d "clang+llvm-4.0.1-x86_64-linux-gnu-Fedora-25" ]; then
-    tar xf clang+llvm-4.0.1-x86_64-linux-gnu-Fedora-25.tar.xz
-fi
-popd
-
-# build decomp tools
-pushd nx-decomp-tools/viking
-cargo build --manifest-path Cargo.toml --release
-popd
-
-
-# create/clear build directory
-if [ -d "build" ]; then
-    rm -rf build
-fi
+# Create/clear build directory
+rm -rf build || true
 mkdir build
 
-# create folder skeleton
-mkdir -p build/OdysseyDecomp-binaries_Linux/bin
-mkdir -p build/OdysseyDecomp-libcxx-headers/include
-
-# copy clang 3.9.1
-cp download/clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang build/OdysseyDecomp-binaries_Linux/bin/
-
-# copy lld from clang 4.0.1
-cp download/clang+llvm-4.0.1-x86_64-linux-gnu-Fedora-25/bin/ld.lld build/OdysseyDecomp-binaries_Linux/bin/
-
-# copy viking tools
-cp nx-decomp-tools/viking/target/release/check build/OdysseyDecomp-binaries_Linux/bin/
-cp nx-decomp-tools/viking/target/release/listsym build/OdysseyDecomp-binaries_Linux/bin/
-cp nx-decomp-tools/viking/target/release/decompme build/OdysseyDecomp-binaries_Linux/bin/
-
-# copy libc++ from clang 3.9.1
-cp -r download/clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-16.04/include/c++/v1/* build/OdysseyDecomp-libcxx-headers/include
-cp -r download/clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-16.04/lib/clang/3.9.1/include/arm_neon.h build/OdysseyDecomp-libcxx-headers/include
-
-
-# create tarball
-pushd build/OdysseyDecomp-binaries_Linux
-tar -cJf ../OdysseyDecomp-binaries_Linux.tar.xz *
+pushd download
+build_llvm_binaries
 popd
-pushd build/OdysseyDecomp-libcxx-headers
-tar -cJf ../OdysseyDecomp-libcxx-headers.tar.xz *
-popd
+
+build_viking_tools
+
+build_archives $1

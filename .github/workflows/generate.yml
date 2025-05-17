@@ -5,38 +5,49 @@ permissions:
 
 jobs:
   generate:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
     - name: Check out project
       uses: actions/checkout@v4
       with:
         submodules: recursive
+    - name: Install llvm tools build dependencies if needed
+      run: |
+          if [ ! -f "download/llvm-3.9.1.src/build/bin/llvm-config" ] || [ ! -f "download/cfe-3.9.1.src/build/bin/clang-3.9" ] || [ ! -f "download/lld-3.9.1.src/build/tools/lld/lld" ]; then
+            sudo apt update && sudo apt install cmake ninja-build clang -y
+            # https://askubuntu.com/questions/1527867/python-2-7-12-install-on-ubuntu-22-04
+            wget http://security.ubuntu.com/ubuntu/pool/universe/p/python2.7/python2.7_2.7.18-13ubuntu1.5_amd64.deb http://security.ubuntu.com/ubuntu/pool/universe/p/python2.7/libpython2.7-stdlib_2.7.18-13ubuntu1.5_amd64.deb http://security.ubuntu.com/ubuntu/pool/universe/p/python2.7/python2.7-minimal_2.7.18-13ubuntu1.5_amd64.deb http://security.ubuntu.com/ubuntu/pool/universe/p/python2.7/libpython2.7-minimal_2.7.18-13ubuntu1.5_amd64.deb && sudo apt install ./libpython2.7-minimal_2.7.18-13ubuntu1.5_amd64.deb ./libpython2.7-stdlib_2.7.18-13ubuntu1.5_amd64.deb ./python2.7-minimal_2.7.18-13ubuntu1.5_amd64.deb ./python2.7_2.7.18-13ubuntu1.5_amd64.deb -y
+          fi
     - name: Set up rust toolchain and caching
       uses: actions-rust-lang/setup-rust-toolchain@v1.12.0
       with:
         cache: true
-        key: linux-tools
         cache-workspaces: nx-decomp-tools/viking
-        cache-directories: |
-          download/clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-16.04
-          download/clang+llvm-4.0.1-x86_64-linux-gnu-Fedora-25
+    - name: Cache llvm tools
+      uses: actions/cache@v4
+      # llvm-objdump is not needed yet, but we cache it so that when it is needed for future releases, the existing cache doesn't need to be dropped
+      with:
+        path: |
+          download/llvm-3.9.1.src/build/bin/llvm-config
+          download/llvm-3.9.1.src/build/bin/llvm-objdump
+          download/cfe-3.9.1.src/build/bin/clang-3.9
+          download/lld-3.9.1.src/build/tools/lld/lld
+        key: x86_64-linux_llvm-tools
     - name: Generate prebuilt archives
-      run: ./generate.sh
+      run: |
+        echo "CC=clang" >> "$GITHUB_ENV"
+        echo "CXX=clang" >> "$GITHUB_ENV"
+        ./generate.sh
     - uses: actions/upload-artifact@v4
       with:
-        name: OdysseyDecomp-binaries_Linux
-        path: build/OdysseyDecomp-binaries_Linux.tar.xz
-    - uses: actions/upload-artifact@v4
-      with:
-        name: OdysseyDecomp-libcxx-headers
-        path: build/OdysseyDecomp-libcxx-headers.tar.xz
+        name: OdysseyDecomp-binaries_x86_64-Linux
+        path: build/OdysseyDecomp-binaries_x86_64-Linux.tar.xz
     - uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
         tag_name: ${{ github.ref_name }}
         files: |
-          build/OdysseyDecomp-binaries_Linux.tar.xz
-          build/OdysseyDecomp-libcxx-headers.tar.xz
+          build/OdysseyDecomp-binaries_x86_64-Linux.tar.xz
         preserve_order: true
         fail_on_unmatched_files: true
         generate_release_notes: true
