@@ -46,6 +46,6 @@ runs:
       with:
         tag_name: ${{ github.ref_name }}
         files: |
-          build/OdysseyDecomp-binaries_${{ inputs.platfrom }}.tar.xz
+          build/OdysseyDecomp-binaries_${{ inputs.platform }}.tar.xz
         preserve_order: true
         fail_on_unmatched_files: true
