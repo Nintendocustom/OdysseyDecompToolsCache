@@ -12,9 +12,10 @@ function build_llvm_binaries {
         -DLLVM_BUILD_DOCS=OFF
         -DLLVM_ENABLE_SPHINX=OFF
         -DLLVM_ENABLE_DOXYGEN=OFF
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     )
 
-    if [ -f "llvm-3.9.1.src/build/bin/llvm-config" ] && [ -f "cfe-3.9.1.src/build/bin/clang-3.9" ] && [ -f "lld-3.9.1.src/build/tools/lld/lld" ]; then
+    if [ -f "cfe-3.9.1.src/build/bin/clang-3.9" ] && [ -f "lld-3.9.1.src/build/tools/lld/lld" ]; then
         return
     fi
 
@@ -124,4 +125,4 @@ popd
 
 build_viking_tools
 
-build_archives $1
+build_archives
