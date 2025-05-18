@@ -103,6 +103,10 @@ function build_archives {
     cp nx-decomp-tools/viking/target/release/listsym build/$BIN_OUT_NAME/bin/
     cp nx-decomp-tools/viking/target/release/decompme build/$BIN_OUT_NAME/bin/
 
+    if [ "$1" == "--no-tarball" ]; then
+        return
+    fi
+
     # Create tools tarball
     pushd build/$BIN_OUT_NAME
     tar -cJf ../$BIN_OUT_NAME.tar.xz *
@@ -120,7 +124,7 @@ rm -rf build || true
 mkdir build
 
 pushd download
-build_llvm_binaries
+build_llvm_binaries $1
 popd
 
 build_viking_tools
