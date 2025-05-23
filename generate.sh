@@ -43,15 +43,13 @@ function build_llvm_binaries {
         curl -O https://releases.llvm.org/3.9.1/cfe-3.9.1.src.tar.xz
     fi
 
-    # Extract clang 3.9.1 src
+    # Extract and patch clang 3.9.1 src
     if [ ! -d "cfe-3.9.1.src" ]; then
         tar xf cfe-3.9.1.src.tar.xz
+        pushd cfe-3.9.1.src
+        patch -p1 < ../../patches/clang-391-compile-fix.patch
+        popd
     fi
-
-    # Apply patch to fix building clang 3.9.1
-    pushd cfe-3.9.1.src
-    patch -p1 --forward < ../../patches/clang-391-compile-fix.patch | true
-    popd
 
     # Build clang 3.9.1
     cmake "${COMMON_CMAKE_ARGS[@]}" -DLLVM_CONFIG=$(pwd)/llvm-3.9.1.src/build/bin/llvm-config -S cfe-3.9.1.src -B cfe-3.9.1.src/build
@@ -62,15 +60,13 @@ function build_llvm_binaries {
         curl -O https://releases.llvm.org/3.9.1/lld-3.9.1.src.tar.xz
     fi
 
-    # Extract lld 3.9.1 src
+    # Extract and patch lld 3.9.1 src
     if [ ! -d "lld-3.9.1.src" ]; then
         tar xf lld-3.9.1.src.tar.xz
+        pushd lld-3.9.1.src
+        patch -p1 < ../../patches/lld-3.9.1-standalone.patch
+        popd
     fi
-
-    # Apply patch to fix building lld 3.9.1
-    pushd lld-3.9.1.src
-    patch -p1 --forward < ../../patches/lld-3.9.1-standalone.patch || true
-    popd
 
     # Build lld 3.9.1
     cmake "${COMMON_CMAKE_ARGS[@]}" -DLLVM_SRC_DIR=$(pwd)/llvm-3.9.1.src -DCMAKE_PREFIX_PATH=$(pwd)/llvm-3.9.1.src/build -DPACKAGE_VERSION="3.9.1" -S lld-3.9.1.src -B lld-3.9.1.src/build
@@ -90,7 +86,6 @@ function build_archives {
 
     # Create folder skeleton
     mkdir -p build/$BIN_OUT_NAME/bin
-    mkdir -p build/OdysseyDecomp-libcxx-headers/include
 
     # Copy clang 3.9.1
     cp download/cfe-3.9.1.src/build/bin/clang-3.9 build/$BIN_OUT_NAME/bin/clang
@@ -124,9 +119,9 @@ rm -rf build || true
 mkdir build
 
 pushd download
-build_llvm_binaries $1
+build_llvm_binaries
 popd
 
 build_viking_tools
 
-build_archives
+build_archives $1
