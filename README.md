@@ -9,3 +9,5 @@ Prerequisites for running generate.sh:
   * cmake
   * ninja
   * python 2.7 (build dependency of old versions of llvm)
+  * a rust toolchain
+  * a c++ compiler (gcc is recommended for building on linux and clang is recommended for building on darwin)
