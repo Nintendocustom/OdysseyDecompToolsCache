@@ -1,3 +1,4 @@
 [submodule "nx-decomp-tools"]
 	path = nx-decomp-tools
-	url = https://github.com/open-ead/nx-decomp-tools
+	url = https://github.com/LynxDev2/nx-decomp-tools
+	branch = file-list-tools
