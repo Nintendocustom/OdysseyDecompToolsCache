@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 function build_llvm_binaries {
 
@@ -79,6 +79,19 @@ function build_viking_tools {
     popd
 }
 
+function build_nx2elf {
+    if [ ! -f "nx2elf/nx2elf" ]; then
+        pushd nx2elf
+        # Use clang with different compiler args on macos
+        if uname -s | grep -q "Darwin" ; then
+        clang++ -o nx2elf *.cpp *.c -std=c++17
+        else
+        make
+        fi
+        popd
+    fi
+}
+
 function build_archives {
     OS=$(uname -s)
     ARCH=$(uname -m)
@@ -97,6 +110,9 @@ function build_archives {
     cp nx-decomp-tools/viking/target/release/check build/$BIN_OUT_NAME/bin/
     cp nx-decomp-tools/viking/target/release/listsym build/$BIN_OUT_NAME/bin/
     cp nx-decomp-tools/viking/target/release/decompme build/$BIN_OUT_NAME/bin/
+
+    # Copy nx2elf
+    cp nx2elf/nx2elf build/$BIN_OUT_NAME/bin/
 
     if [ "$1" == "--no-tarball" ]; then
         return
@@ -123,5 +139,7 @@ build_llvm_binaries
 popd
 
 build_viking_tools
+
+build_nx2elf
 
 build_archives $1

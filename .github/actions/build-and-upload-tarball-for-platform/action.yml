@@ -13,10 +13,9 @@ runs:
   steps:
     - name: Cache llvm tools
       uses: actions/cache@v4
-      # llvm-objdump is not needed yet, but we cache it so that when it is needed for future releases, the existing cache doesn't need to be dropped
       with:
         path: |
-          download/llvm-3.9.1.src/build/bin/llvm-objdump
+          nx2elf/nx2elf
           download/cfe-3.9.1.src/build/bin/clang-3.9
           download/lld-3.9.1.src/build/tools/lld/lld
         key: ${{ inputs.platform }}_llvm-tools

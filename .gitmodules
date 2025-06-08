@@ -2,3 +2,6 @@
 	path = nx-decomp-tools
 	url = https://github.com/LynxDev2/nx-decomp-tools
 	branch = file-list-tools
+[submodule "nx2elf"]
+	path = nx2elf
+	url = https://github.com/MonsterDruide1/nx2elf
