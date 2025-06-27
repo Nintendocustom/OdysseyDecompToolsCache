@@ -15,7 +15,6 @@ runs:
       uses: actions/cache@v4
       with:
         path: |
-          nx2elf/nx2elf
           download/cfe-3.9.1.src/build/bin/clang-3.9
           download/lld-3.9.1.src/build/tools/lld/lld
         key: ${{ inputs.platform }}_llvm-tools
