@@ -95,7 +95,7 @@ function build_nx2elf {
 function build_archives {
     OS=$(uname -s)
     ARCH=$(uname -m)
-    BIN_OUT_NAME="OdysseyDecomp-binaries_$ARCH-$OS"
+    BIN_OUT_NAME="LCUDecomp-binaries_$ARCH-$OS"
 
     # Create folder skeleton
     mkdir -p build/$BIN_OUT_NAME/bin
